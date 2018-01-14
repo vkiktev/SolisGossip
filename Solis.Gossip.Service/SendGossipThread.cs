@@ -136,12 +136,12 @@ namespace Solis.Gossip.Service
                 int packet_length = json_bytes.Length;
                 if (packet_length < GossipNode.MAX_PACKET_SIZE)
                 {
-                    Response r = await _gossipManager.Send(message, peer.EndPoint);
+                    Response r = await _gossipManager.SendAsync(message, peer.EndPoint);
                     if (r is HeartbeatResponse)
                     {
                         Logger.Info($"Message {message} generated response {r}");
                     }
-                    else
+                    else if(r is ErrorResponse)
                     {
                         Logger.Warn($"Message {message} generated response {r}");
                     }

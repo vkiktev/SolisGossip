@@ -1,8 +1,7 @@
 {
   "profiles": {
     "Solis.Gossip.Host": {
-      "commandName": "Project",
-      "commandLineArgs": "gossip.conf"
+      "commandName": "Project"
     }
   }
 }

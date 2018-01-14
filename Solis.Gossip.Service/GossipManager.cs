@@ -64,14 +64,22 @@ namespace Solis.Gossip.Service
                     {
                         _gossipNode.AddPeer(request.Peer);
                     }
+                    else
+                    {
+                        var needReply = MergeLists(request.Peer, request.Members);
 
-                    HeartbeatResponse o = new HeartbeatResponse();
-                    o.Members.AddRange(_gossipNode.RemotePeers);
-                    o.UriFrom = message.UriFrom;
-                    o.Id = message.Id;
-                    o.RequestMessageId = message.Id;
+                        if (needReply)
+                        {
+                            HeartbeatResponse o = new HeartbeatResponse();
+                            o.Members.Add(_gossipNode.GossipPeer);
+                            o.Members.AddRange(_gossipNode.RemotePeers);
+                            o.UriFrom = message.UriFrom;
+                            o.Id = message.Id;
+                            o.RequestMessageId = message.Id;
 
-                    await SendOneWay(o, remoteEndPoint);
+                            await SendOneWay(o, remoteEndPoint);
+                        }
+                    }
                 }
             }
             else if (message is HeartbeatResponse)
@@ -79,10 +87,7 @@ namespace Solis.Gossip.Service
                 HeartbeatResponse heartbeatResponse = (HeartbeatResponse)message;
                 GossipPeer senderPeer = heartbeatResponse.Members?.FirstOrDefault();
 
-                if (heartbeatResponse.Members?.Any() == true)
-                {
-                    MergeLists(senderPeer, heartbeatResponse.Members);
-                }
+                MergeLists(senderPeer, heartbeatResponse.Members);
             }
         }
 
@@ -118,7 +123,7 @@ namespace Solis.Gossip.Service
         /// <param name="message"></param>
         /// <param name="uri"></param>
         /// <returns></returns>
-        public async Task<Response> Send(BaseMessage message, IPEndPoint endPoint)
+        public async Task<Response> SendAsync(BaseMessage message, IPEndPoint endPoint)
         {
             await SendInternal(message, endPoint);
 
@@ -201,8 +206,9 @@ namespace Solis.Gossip.Service
         /// </summary>
         /// <param name="senderPeer"></param>
         /// <param name="remoteList"></param>
-        protected void MergeLists(GossipPeer senderPeer, List<GossipPeer> remoteList)
+        protected bool MergeLists(GossipPeer senderPeer, List<GossipPeer> remoteList)
         {
+            var needReply = false;
             foreach (GossipPeer remotePeer in remoteList)
             {
                 if (remotePeer.Id == _gossipNode.GossipPeer.Id)
@@ -228,12 +234,18 @@ namespace Solis.Gossip.Service
                             _gossipNode.WakeUpPeer(remotePeer);
                         }
                     }
+                    else
+                    {
+                        needReply = true;
+                    }
                 }
                 else
                 {
                     _gossipNode.AddPeer(remotePeer);
                 }
             }
+
+            return needReply;
         }
     }
 }
