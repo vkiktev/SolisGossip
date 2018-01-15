@@ -1,0 +1,17 @@
+0. I'm alone StateMachine (Initialized)
+1. Send greetings! StateMachine (SentGreetings), Save messageId in cache
+2. Start timer waiting for heartbeat StateMachine (SentGreetings)
+3.1. Receive welcome: if SentGreetings -> StateMachine (Infected) else ...
+3.1.1 Add remote peers, set remote peer heartbeat time StateMachine (Infected) 
+3.1.2 Start heartbeat timer StateMachine (Infected)
+3.2. Timer is off  Remove messageId from cache StateMachine (SentGreetings)
+3.2.1 Reset timer send greetings StateMachine (Initialized) go to 0
+4. Timer heartbeat is off StateMachine (Susceptible)
+5. Send heartbeat request StateMachine (SentHeartbeat), Save messageId in cache
+6. Start timer waiting heartbeat StateMachine (SentHeartbeat)
+6.1 Receive heartbeat StateMachine (SentHeartbeat)
+6.1.1 Remote heartbeat > Local heartbeat => Apply remote peers and heartbeat StateMachine (Infected)
+6.1.2 Remote heartbeat < Local heartbeat => Send local peers to remote StateMachine (Infected?Susceptible)
+6.2 Timer is off StateMachine (Susceptible)
+7. Receive greetings! 
+7.1 Send heartbeat response

@@ -25,12 +25,25 @@ namespace Solis.Gossip.Service
         private GossipNode _gossipNode;
         private TaskFactory service;
         private CancellationTokenSource cts;
+        private ConcurrentDictionary<string, BaseMessage> _requests;
 
         public GossipManager(GossipNode gossipNode)
         {
             _gossipNode = gossipNode;
             service = new TaskFactory();
             cts = new CancellationTokenSource();
+
+            _requests = new ConcurrentDictionary<string, BaseMessage>();
+        }
+
+        public void AddRequest(string peerId, BaseMessage message)
+        {
+            _requests.TryAdd(peerId, message);
+        }
+
+        public void RemoveRequest(string peerId, BaseMessage message)
+        {
+            _requests.TryAdd(peerId, message);
         }
 
         public void Shutdown()
@@ -55,8 +68,8 @@ namespace Solis.Gossip.Service
         {
             if (message is Request)
             {
-                if(message is HeartbeatRequest)
-                {                    
+                if (message is HeartbeatRequest)
+                {
                     var request = ((HeartbeatRequest)message);
                     if (request.IsGreetings)
                     {
@@ -75,7 +88,7 @@ namespace Solis.Gossip.Service
                             o.Id = message.Id;
                             o.RequestMessageId = message.Id;
 
-                            await SendOneWay(o, remoteEndPoint);
+                            await SendAsync(o, remoteEndPoint);
                         }
                     }
                 }
@@ -87,31 +100,9 @@ namespace Solis.Gossip.Service
 
                 MergeLists(senderPeer, heartbeatResponse.Members);
             }
-        }
-
-        private async Task SendInternal(BaseMessage message, IPEndPoint endPoint)
-        {
-            JsonSerializerSettings settings = new JsonSerializerSettings
+            else if (message is ErrorResponse)
             {
-                TypeNameHandling = TypeNameHandling.All
-            };
-            byte[] json_bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message, settings));
-            
-            int packet_length = json_bytes.Length;
-            if (packet_length < GossipNode.MAX_PACKET_SIZE)
-            {
-                try
-                {
-                    using (UdpClient socket = new UdpClient())
-                    {
-                        await socket.SendAsync(json_bytes, packet_length, endPoint);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "SendInternal");
-                    throw;
-                }
+                Console.WriteLine(((ErrorResponse)message).ErrorMessage);
             }
         }
 
@@ -121,81 +112,38 @@ namespace Solis.Gossip.Service
         /// <param name="message"></param>
         /// <param name="uri"></param>
         /// <returns></returns>
-        public async Task<Response> SendAsync(BaseMessage message, IPEndPoint endPoint)
+        public async Task SendAsync(BaseMessage message, IPEndPoint endPoint)
         {
-            await SendInternal(message, endPoint);
-
-            Task<Response> task = Task.Run(async () =>
-               {
-                   while (true)
-                   {
-                       BaseMessage baseMsg = null;
-                       var success = requests.TryRemove($"{message.Id}/{message.UriFrom}", out baseMsg);
-                       if (success)
-                       {
-                           return (Response)baseMsg;
-                       }
-
-                       if(requests.Count == 0)
-                       {
-                           return null;
-                       }
-
-                       await Task.Delay(1000);
-                   }
-               });
-
-            Response response = null;
-            try
+            if (!_requests.Any(x => x.Key == message.Id))
             {
-                response = await task;
-            }
-            catch (Exception e)
-            {
-                Logger.Debug(e, e.Message);
-                return null;
-            }
-            finally
-            {
-                BaseMessage baseMsg = null;
-                requests.TryRemove($"{message.Id}/{message.UriFrom}", out baseMsg);
-            }
-
-            return response;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="u"></param>
-        /// <returns></returns>
-        public async Task SendOneWay(BaseMessage message, IPEndPoint endPoint)
-        {
-            JsonSerializerSettings settings = new JsonSerializerSettings
-            {
-                TypeNameHandling = TypeNameHandling.All
-            };
-
-            byte[] json_bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message, settings));
-            
-            int packet_length = json_bytes.Length;
-            if (packet_length < GossipNode.MAX_PACKET_SIZE)
-            {
-                try
+                JsonSerializerSettings settings = new JsonSerializerSettings
                 {
-                    using (UdpClient udpClient = new UdpClient())
+                    TypeNameHandling = TypeNameHandling.All
+                };
+
+                byte[] json_bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message, settings));
+
+                int packet_length = json_bytes.Length;
+                if (packet_length < GossipNode.MAX_PACKET_SIZE)
+                {
+                    try
                     {
-                        await udpClient.SendAsync(json_bytes, packet_length, endPoint);
+                        using (UdpClient socket = new UdpClient())
+                        {
+                            await socket.SendAsync(json_bytes, packet_length, endPoint);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error(e, "SendAsync");
+                        throw;
                     }
                 }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "SendOneWay");
-                }
+
+                _requests.Add(_gossipNode.GossipPeer, "Greatings");
+                // _gossipNode.GossipPeer.StartTimer();
             }
         }
-
 
         /// <summary>
         /// Merge remote list (received from peer), and our local member list. Simply, we must update the
