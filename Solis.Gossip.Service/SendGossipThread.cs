@@ -4,6 +4,7 @@ using Solis.Gossip.Model;
 using Solis.Gossip.Model.Messages;
 using Solis.Gossip.Model.Settings;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -30,6 +31,7 @@ namespace Solis.Gossip.Service
 
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
+        private ConcurrentDictionary<string, BaseMessage> _requests;
         private bool _keepRunning;
         private Timer _replyTimer;
         private Timer _heartbeatTimer;
@@ -44,19 +46,31 @@ namespace Solis.Gossip.Service
 
             _replyTimer = new Timer(new TimerCallback(ReplyTimerHandle));
             _heartbeatTimer = new Timer(new TimerCallback(HeartbeatTimerHandle));
+
+            _requests = new ConcurrentDictionary<string, BaseMessage>();
         }
 
         private async void HeartbeatTimerHandle(object state)
         {
             if (!_gossipNode.RemotePeers.Any())
             {
+                // if(!_request.Any(x => x.Key == _gossipNode.GossipPeer && x.Value == "Greatings")) 
+                // {
                 await SendGreetings(_gossipNode.GossipPeer);
+                // _requests.Add(_gossipNode.GossipPeer, "Greatings");
+                // _gossipNode.GossipPeer.StartTimer();
+                // }
             }
             else
             {
                 try
                 {
-                    await SendMembershipList(_gossipNode.GossipPeer, _gossipNode.RemotePeers);
+                    // if(!_request.Any(x => x.Key == _gossipNode.GossipPeer && x.Value == "Heartbeat")) 
+                    // {
+                    await SendHeartbeat(_gossipNode.GossipPeer, _gossipNode.RemotePeers);
+                    // _requests.Add(_gossipNode.GossipPeer, "Heartbeat");
+                    // _gossipNode.GossipPeer.StartTimer();
+                    // }
                 }
                 catch (Exception e)
                 {
@@ -107,18 +121,19 @@ namespace Solis.Gossip.Service
         /// <param name="peer"></param>
         /// <param name="memberList"></param>
         /// <returns></returns>
-        protected async Task SendMembershipList(GossipPeer peer, List<GossipPeer> memberList)
+        protected async Task SendHeartbeat(GossipPeer peer, List<GossipPeer> memberList)
         {
-            // peer.Heartbeat = DateTime.Now;
+            peer.Heartbeat = DateTime.Now;
+
             var remotePeer = SelectNeighbor(memberList);
             if (peer == null)
             {
-                Logger.Debug("SendMembershipList is called without action");
+                Logger.Debug("SendHeartbeat is called without action");
                 return;
             }
             else
             {
-                Logger.Debug($"SendMembershipList is called to {peer.ToString()}");
+                Logger.Debug($"SendHeartbeat is called to {peer.ToString()}");
             }
 
             try
@@ -168,10 +183,10 @@ namespace Solis.Gossip.Service
             if (memberList.Count > 0)
             {
                 int tryCount = 0;
+                Random random = new Random();
+
                 do
                 {
-                    Random random = new Random();
-
                     int randomNeighborIndex = random.Next(0, memberList.Count - 1);
                     peer = memberList[randomNeighborIndex];
 
@@ -186,6 +201,7 @@ namespace Solis.Gossip.Service
             {
                 Logger.Debug("I am alone.");
             }
+
             return peer;
         }
     }

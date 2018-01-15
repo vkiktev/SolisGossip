@@ -23,14 +23,12 @@ namespace Solis.Gossip.Service
     {
         public static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipManager));
         private GossipNode _gossipNode;
-        private ConcurrentDictionary<string, BaseMessage> requests;
         private TaskFactory service;
         private CancellationTokenSource cts;
 
         public GossipManager(GossipNode gossipNode)
         {
             _gossipNode = gossipNode;
-            requests = new ConcurrentDictionary<string, BaseMessage>();
             service = new TaskFactory();
             cts = new CancellationTokenSource();
         }
