@@ -30,8 +30,6 @@ namespace Solis.Gossip.Service
         private GossipManager _gossipManager;
 
         private CancellationTokenSource _cts = new CancellationTokenSource();
-
-        private ConcurrentDictionary<string, BaseMessage> _requests;
         private bool _keepRunning;
         private Timer _replyTimer;
         private Timer _heartbeatTimer;
@@ -46,20 +44,13 @@ namespace Solis.Gossip.Service
 
             _replyTimer = new Timer(new TimerCallback(ReplyTimerHandle));
             _heartbeatTimer = new Timer(new TimerCallback(HeartbeatTimerHandle));
-
-            _requests = new ConcurrentDictionary<string, BaseMessage>();
         }
 
         private async void HeartbeatTimerHandle(object state)
         {
             if (!_gossipNode.RemotePeers.Any())
             {
-                // if(!_request.Any(x => x.Key == _gossipNode.GossipPeer && x.Value == "Greatings")) 
-                // {
                 await SendGreetings(_gossipNode.GossipPeer);
-                // _requests.Add(_gossipNode.GossipPeer, "Greatings");
-                // _gossipNode.GossipPeer.StartTimer();
-                // }
             }
             else
             {
@@ -90,7 +81,7 @@ namespace Solis.Gossip.Service
         
         private Task SendGreetings(GossipPeer peer)
         {
-            return _gossipManager.SendOneWay(new HeartbeatRequest(peer, true), new IPEndPoint(IPAddress.Broadcast, peer.EndPoint.Port));
+            return _gossipManager.SendAsync(new HeartbeatRequest(peer, true), new IPEndPoint(IPAddress.Broadcast, peer.EndPoint.Port));
         }
 
         public void Run()
@@ -151,15 +142,7 @@ namespace Solis.Gossip.Service
                 int packet_length = json_bytes.Length;
                 if (packet_length < GossipNode.MAX_PACKET_SIZE)
                 {
-                    Response r = await _gossipManager.SendAsync(message, peer.EndPoint);
-                    if (r is HeartbeatResponse)
-                    {
-                        Logger.Info($"Message {message} generated response {r}");
-                    }
-                    else if(r is ErrorResponse)
-                    {
-                        Logger.Warn($"Message {message} generated response {r}");
-                    }
+                    await _gossipManager.SendAsync(message, peer.EndPoint);
                 }
                 else
                 {

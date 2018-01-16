@@ -9,6 +9,8 @@ namespace Solis.Gossip.Model.Messages
             Members = new List<GossipPeer>();
         }
 
+        public bool IsWelcome { get; set; }
+
         public List<GossipPeer> Members { get; private set; }
     }
 }
