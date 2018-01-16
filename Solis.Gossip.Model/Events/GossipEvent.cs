@@ -2,12 +2,12 @@
 {
     public enum GossipEvent
     {
-        SendGreetings,
-        StartWaitingForConnection,
-        ReceiveWelcome,
-        GreetingsExpired,
-        HeartbeatTimerExpired,
-        ReceiveHeartbeat,
-        ReceiveGreetings
+        HelloSend,
+        HelloReceive,
+        HelloExpired,
+        HeartbeatElapsed,
+        HeartbeatExpired,
+        HeartbeatSend,
+        HeartbeatReceive
     }
 }

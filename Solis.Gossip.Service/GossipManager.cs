@@ -24,7 +24,6 @@ namespace Solis.Gossip.Service
     {
         public static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipManager));
         private GossipNode _gossipNode;
-<<<<<<< HEAD
         private CancellationTokenSource _cts;
         private ConcurrentDictionary<string, BaseMessage> _requests;
 
@@ -32,85 +31,73 @@ namespace Solis.Gossip.Service
         private event EventHandler SendGreetingsEvent;
         private event EventHandler SendHeartbeatEvent;
 
-        private NodeState _state;
-=======
-        private TaskFactory service;
-        private CancellationTokenSource cts;
-        private ConcurrentDictionary<string, BaseMessage> _requests;
->>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
+        private CurrentStateExtension _currentStateExtension;
 
         public GossipManager(GossipNode gossipNode)
         {
             _gossipNode = gossipNode;
-<<<<<<< HEAD
             _cts = new CancellationTokenSource();
+            _currentStateExtension = new CurrentStateExtension();
 
             _requests = new ConcurrentDictionary<string, BaseMessage>();
 
             _fsm = new AsyncPassiveStateMachine<NodeState, GossipEvent>("GossipManager");
             _fsm.AddExtension(new ConsoleLogExtension());
+            _fsm.AddExtension(_currentStateExtension);
 
             _fsm.Initialize(NodeState.Initialized);
 
-            _state = NodeState.Initialized;
-
             _fsm.In(NodeState.Initialized)
-                .On(GossipEvent.SendGreetings)
+                .On(GossipEvent.HelloSend)
                     .Goto(NodeState.SentGreetings)
                 .Execute(() => 
                 {
                     SendGreetings();
-                    _state = NodeState.SentGreetings;
                 });
 
             _fsm.In(NodeState.SentGreetings)
-                .On(GossipEvent.ReceiveWelcome)
+                .On(GossipEvent.HelloReceive)
                     .Goto(NodeState.Infected)
                 .Execute(() => 
                 {
                     ReceiveWelcome();
-                    _state = NodeState.Infected;
                 })
-                .On(GossipEvent.GreetingsExpired)
+                .On(GossipEvent.HelloExpired)
                     .Goto(NodeState.Initialized)
                 .Execute(() => 
                     { 
                         SendGreetings();
-                        _state = NodeState.Initialized;
                     });
 
             _fsm.In(NodeState.Infected)
-                .On(GossipEvent.HeartbeatTimerExpired)
+                .On(GossipEvent.HeartbeatExpired)
                     .Goto(NodeState.Susceptible)
                 .Execute(() => 
                 {
                     SendHeartbeat();
-                    _state = NodeState.Susceptible;
                 });
 
             _fsm.In(NodeState.Infected)
-                .On(GossipEvent.ReceiveGreetings)
+                .On(GossipEvent.HelloReceive)
                 .Execute(() =>
                 {
                     SendHeartbeat();
-                    _state = NodeState.Infected;
                 });
 
             _fsm.In(NodeState.Susceptible)
-                .On(GossipEvent.ReceiveGreetings)
+                .On(GossipEvent.HelloReceive)
                 .Execute(() =>
                 {
                     SendHeartbeat();
-                    _state = NodeState.Susceptible;
                 })
-                .On(GossipEvent.ReceiveHeartbeat)
+                .On(GossipEvent.HeartbeatReceive)
                     .If<DateTime>((dt) =>
                     {
                         return CheckHeartbeat(dt);
                     })
                     .Goto(NodeState.Infected)
                     .Execute(() => {
-                        _state = NodeState.Infected;
+                        // do nothing
                     });
 
             _fsm.Start();
@@ -144,12 +131,6 @@ namespace Solis.Gossip.Service
         private bool CheckHeartbeat(DateTime remoteHeartbeat)
         {
             return _gossipNode.GossipPeer.Heartbeat > remoteHeartbeat;
-=======
-            service = new TaskFactory();
-            cts = new CancellationTokenSource();
-
-            _requests = new ConcurrentDictionary<string, BaseMessage>();
->>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
         }
 
         public void AddRequest(string peerId, BaseMessage message)
@@ -185,69 +166,51 @@ namespace Solis.Gossip.Service
         {
             if (message is Request)
             {
-                if (message is HeartbeatRequest)
+                bool needReply = true;
+                var request = ((HeartbeatRequest)message);
+
+                if (message is HelloRequest)
                 {
-<<<<<<< HEAD
-                    bool needReply = true;
+                    
+                    _gossipNode.AddPeer(request.Peer);
+                    await _fsm.Fire(GossipEvent.HelloReceive);
+                }
+                else if (message is HeartbeatRequest)
+                {
+                    needReply = MergeLists(request.Peer, request.Members);
+                    await _fsm.Fire(GossipEvent.HeartbeatReceive);
+                }
 
-=======
->>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
-                    var request = ((HeartbeatRequest)message);
-                    if (request.IsGreetings)
-                    {
-                        _gossipNode.AddPeer(request.Peer);
-                        await _fsm.Fire(GossipEvent.ReceiveGreetings);
-                    }
-                    else
-                    {
-                        needReply = MergeLists(request.Peer, request.Members);
-                        await _fsm.Fire(GossipEvent.ReceiveHeartbeat);
-                    }
+                if (needReply)
+                {
+                    HeartbeatResponse o = new HeartbeatResponse();
+                    o.Members.Add(_gossipNode.GossipPeer);
+                    o.Members.AddRange(_gossipNode.RemotePeers);
+                    o.UriFrom = message.UriFrom;
+                    o.Id = message.Id;
+                    o.RequestMessageId = message.Id;
 
-<<<<<<< HEAD
-                    if (needReply)
-                    {
-                        HeartbeatResponse o = new HeartbeatResponse();
-                        o.Members.Add(_gossipNode.GossipPeer);
-                        o.Members.AddRange(_gossipNode.RemotePeers);
-                        o.UriFrom = message.UriFrom;
-                        o.Id = message.Id;
-                        o.RequestMessageId = message.Id;
-
-                        await SendAsync(o, remoteEndPoint);
-=======
-                        if (needReply)
-                        {
-                            HeartbeatResponse o = new HeartbeatResponse();
-                            o.Members.Add(_gossipNode.GossipPeer);
-                            o.Members.AddRange(_gossipNode.RemotePeers);
-                            o.UriFrom = message.UriFrom;
-                            o.Id = message.Id;
-                            o.RequestMessageId = message.Id;
-
-                            await SendAsync(o, remoteEndPoint);
-                        }
->>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
-                    }
-
-
+                    await SendAsync(o, remoteEndPoint);
                 }
             }
-            else if (message is WelcomeResponse)
+            else if (message is Response)
             {
+                if (message is HelloResponse)
+                {
 
-            }
-            else if (message is HeartbeatResponse)
-            {
-                HeartbeatResponse heartbeatResponse = (HeartbeatResponse)message;
+                }
+                else if (message is HeartbeatResponse)
+                {
+                    HeartbeatResponse heartbeatResponse = (HeartbeatResponse)message;
 
-                GossipPeer senderPeer = heartbeatResponse.Members?.FirstOrDefault();
+                    GossipPeer senderPeer = heartbeatResponse.Members?.FirstOrDefault();
 
-                MergeLists(senderPeer, heartbeatResponse.Members);
-            }
-            else if (message is ErrorResponse)
-            {
-                Console.WriteLine(((ErrorResponse)message).ErrorMessage);
+                    MergeLists(senderPeer, heartbeatResponse.Members);
+                }
+                else if (message is ErrorResponse)
+                {
+                    Console.WriteLine(((ErrorResponse)message).ErrorMessage);
+                }
             }
         }
 
@@ -259,34 +222,28 @@ namespace Solis.Gossip.Service
         /// <returns></returns>
         public async Task SendAsync(BaseMessage message, IPEndPoint endPoint)
         {
-            if (!_requests.Any(x => x.Key == message.Id))
+            JsonSerializerSettings settings = new JsonSerializerSettings
             {
-                JsonSerializerSettings settings = new JsonSerializerSettings
-                {
-                    TypeNameHandling = TypeNameHandling.All
-                };
+                TypeNameHandling = TypeNameHandling.All
+            };
 
-                byte[] json_bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message, settings));
+            byte[] json_bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message, settings));
 
-                int packet_length = json_bytes.Length;
-                if (packet_length < GossipNode.MAX_PACKET_SIZE)
+            int packet_length = json_bytes.Length;
+            if (packet_length < GossipNode.MAX_PACKET_SIZE)
+            {
+                try
                 {
-                    try
+                    using (UdpClient socket = new UdpClient())
                     {
-                        using (UdpClient socket = new UdpClient())
-                        {
-                            await socket.SendAsync(json_bytes, packet_length, endPoint);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Error(e, "SendAsync");
-                        throw;
+                        await socket.SendAsync(json_bytes, packet_length, endPoint);
                     }
                 }
-
-                _requests.Add(_gossipNode.GossipPeer, "Greatings");
-                // _gossipNode.GossipPeer.StartTimer();
+                catch (Exception e)
+                {
+                    Logger.Error(e, "SendAsync");
+                    throw;
+                }
             }
         }
 

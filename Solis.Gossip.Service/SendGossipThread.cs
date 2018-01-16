@@ -81,7 +81,7 @@ namespace Solis.Gossip.Service
         
         private Task SendGreetings(GossipPeer peer)
         {
-            return _gossipManager.SendAsync(new HeartbeatRequest(peer, true), new IPEndPoint(IPAddress.Broadcast, peer.EndPoint.Port));
+            return _gossipManager.SendAsync(new HelloRequest(peer), new IPEndPoint(IPAddress.Broadcast, peer.EndPoint.Port));
         }
 
         public void Run()
