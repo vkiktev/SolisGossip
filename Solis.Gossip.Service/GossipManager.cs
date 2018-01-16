@@ -24,6 +24,7 @@ namespace Solis.Gossip.Service
     {
         public static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipManager));
         private GossipNode _gossipNode;
+<<<<<<< HEAD
         private CancellationTokenSource _cts;
         private ConcurrentDictionary<string, BaseMessage> _requests;
 
@@ -32,10 +33,16 @@ namespace Solis.Gossip.Service
         private event EventHandler SendHeartbeatEvent;
 
         private NodeState _state;
+=======
+        private TaskFactory service;
+        private CancellationTokenSource cts;
+        private ConcurrentDictionary<string, BaseMessage> _requests;
+>>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
 
         public GossipManager(GossipNode gossipNode)
         {
             _gossipNode = gossipNode;
+<<<<<<< HEAD
             _cts = new CancellationTokenSource();
 
             _requests = new ConcurrentDictionary<string, BaseMessage>();
@@ -137,6 +144,12 @@ namespace Solis.Gossip.Service
         private bool CheckHeartbeat(DateTime remoteHeartbeat)
         {
             return _gossipNode.GossipPeer.Heartbeat > remoteHeartbeat;
+=======
+            service = new TaskFactory();
+            cts = new CancellationTokenSource();
+
+            _requests = new ConcurrentDictionary<string, BaseMessage>();
+>>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
         }
 
         public void AddRequest(string peerId, BaseMessage message)
@@ -174,8 +187,11 @@ namespace Solis.Gossip.Service
             {
                 if (message is HeartbeatRequest)
                 {
+<<<<<<< HEAD
                     bool needReply = true;
 
+=======
+>>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
                     var request = ((HeartbeatRequest)message);
                     if (request.IsGreetings)
                     {
@@ -188,6 +204,7 @@ namespace Solis.Gossip.Service
                         await _fsm.Fire(GossipEvent.ReceiveHeartbeat);
                     }
 
+<<<<<<< HEAD
                     if (needReply)
                     {
                         HeartbeatResponse o = new HeartbeatResponse();
@@ -198,6 +215,19 @@ namespace Solis.Gossip.Service
                         o.RequestMessageId = message.Id;
 
                         await SendAsync(o, remoteEndPoint);
+=======
+                        if (needReply)
+                        {
+                            HeartbeatResponse o = new HeartbeatResponse();
+                            o.Members.Add(_gossipNode.GossipPeer);
+                            o.Members.AddRange(_gossipNode.RemotePeers);
+                            o.UriFrom = message.UriFrom;
+                            o.Id = message.Id;
+                            o.RequestMessageId = message.Id;
+
+                            await SendAsync(o, remoteEndPoint);
+                        }
+>>>>>>> ef6c834203f8f9d0c44ff7a0910d7b76ab35e8da
                     }
 
 
