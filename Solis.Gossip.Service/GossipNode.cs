@@ -5,21 +5,22 @@ using System.Linq;
 using NLog;
 using Solis.Gossip.Model;
 using Solis.Gossip.Model.Settings;
+using Solis.Gossip.Service.Contracts;
+using System.Net;
 
 namespace Solis.Gossip.Service
 {
     /// <summary>
     /// The gossip node
     /// </summary>
-    public class GossipNode 
+    public class GossipNode : IGossipNode
     {
-        public static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipNode));
+        private static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipNode));
         public static int MAX_PACKET_SIZE = 102400;
 
-        private ConcurrentDictionary<string, GossipPeer> _remotePeers;        
+        private ConcurrentDictionary<string, IGossipPeer> _remotePeers;        
         private GossipPeer _gossipPeer;
         private GossipSettings _settings;
-        private bool _gossipServiceRunning;
 
         private SendGossipThread _activeGossipThread;
         private ReceiveGossipThread _passiveGossipThread;
@@ -34,18 +35,18 @@ namespace Solis.Gossip.Service
         {
             _settings = settings;
             _gossipManager = new GossipManager(this);
-            _remotePeers = new ConcurrentDictionary<string, GossipPeer>();
-            
-            _gossipServiceRunning = true;
+            _remotePeers = new ConcurrentDictionary<string, IGossipPeer>();
+
+            _gossipPeer = new GossipPeer(settings.ClusterName, new IPEndPoint(IPAddress.Any, settings.Port), settings.Id, DateTime.MinValue);
         }
 
-        public void AddPeer(GossipPeer peer)
+        public void AddPeer(IGossipPeer peer)
         {
             _remotePeers.TryAdd(peer.Id, peer);
             NewPeerFound?.Invoke(this, new GossipPeerEventArgs(peer));
         }
 
-        internal void WakeUpPeer(GossipPeer peer)
+        public void WakeUpPeer(IGossipPeer peer)
         {
             _remotePeers.AddOrUpdate(peer.Id, peer, (id, p) =>
             {
@@ -56,7 +57,7 @@ namespace Solis.Gossip.Service
             PeerWakeUp?.Invoke(this, new GossipPeerEventArgs(peer));
         }
 
-        public void DownPeer(GossipPeer peer)
+        public void DownPeer(IGossipPeer peer)
         {
             _remotePeers.AddOrUpdate(peer.Id, peer, (id, p) =>
             {
@@ -67,26 +68,18 @@ namespace Solis.Gossip.Service
             PeerDown?.Invoke(this, new GossipPeerEventArgs(peer));
         }
 
-        public GossipSettings Settings
-        {
-            get
-            {
-                return _settings;
-            }
-        }
-
         /// <summary>
         /// Read only list of remote peers
         /// </summary>
-        public List<GossipPeer> RemotePeers
+        public IList<IGossipPeer> RemotePeers
         {
             get
             {
-                return _remotePeers.Values.ToList();
+                return _remotePeers.Values.ToList<IGossipPeer>();
             }
         }
 
-        public GossipPeer GossipPeer
+        public IGossipPeer GossipPeer
         {
             get
             {
@@ -114,7 +107,6 @@ namespace Solis.Gossip.Service
         /// </summary>
         public void Shutdown()
         {
-            _gossipServiceRunning = false;
             _gossipManager.Shutdown();
 
             if (_passiveGossipThread != null)

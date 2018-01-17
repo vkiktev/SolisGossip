@@ -5,6 +5,7 @@ using Solis.Gossip.Model;
 using Solis.Gossip.Model.Events;
 using Solis.Gossip.Model.Messages;
 using Solis.Gossip.Model.Settings;
+using Solis.Gossip.Service.Contracts;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -17,9 +18,9 @@ using System.Threading.Tasks;
 
 namespace Solis.Gossip.Service
 {
-    public class GossipManager
+    public class GossipManager : IGossipManager
     {
-        public static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipManager));
+        private static Logger Logger = SolisLogFactory.GetLogger(typeof(GossipManager));
         private GossipNode _gossipNode;
         private CancellationTokenSource _cts;
         private ConcurrentDictionary<string, BaseMessage> _requests;
@@ -27,8 +28,6 @@ namespace Solis.Gossip.Service
         private const int ResponseWaitTimeout = 60 * 1000;
 
         private AsyncPassiveStateMachine<NodeState, GossipEvent> _fsm;
-        private event EventHandler SendHelloEvent;
-        private event EventHandler SendHeartbeatEvent;
 
         private CurrentStateExtension _currentStateExtension;
 
@@ -85,7 +84,7 @@ namespace Solis.Gossip.Service
                 .On(GossipEvent.HeartbeatAnswer)
                     .Goto(NodeState.Infected)
                 .Execute<HeartbeatResponse>((msg) => {
-                    GossipPeer senderPeer = msg.Members?.FirstOrDefault();
+                    IGossipPeer senderPeer = msg.Members?.FirstOrDefault();
                     MergeLists(senderPeer, msg.Members);
                 });
 
@@ -103,9 +102,9 @@ namespace Solis.Gossip.Service
                     await SendHelloAnswer(msg);
                 })
                 .On(GossipEvent.HeartbeatReceive)
-                    .If<DateTime>((dt) =>
+                    .If<HeartbeatRequest>((msg) =>
                     {
-                        return CheckHeartbeat(dt);
+                        return _gossipNode.GossipPeer.Heartbeat < msg.Peer.Heartbeat;
                     })
                     .Goto(NodeState.Infected)
                     .Execute<HeartbeatRequest>(async (msg) =>
@@ -129,7 +128,7 @@ namespace Solis.Gossip.Service
             {
                 HeartbeatResponse o = new HeartbeatResponse();
                 o.Members.Add(_gossipNode.GossipPeer);
-                o.Members.AddRange(_gossipNode.RemotePeers);
+                o.Members.Concat(_gossipNode.RemotePeers);
                 o.RemoteEndPoint = _gossipNode.GossipPeer.EndPoint;
                 o.Id = Guid.NewGuid().ToString();
                 o.RequestMessageId = msg.Id;
@@ -167,7 +166,7 @@ namespace Solis.Gossip.Service
 
             HelloResponse o = new HelloResponse();
             o.Members.Add(_gossipNode.GossipPeer);
-            o.Members.AddRange(_gossipNode.RemotePeers);
+            o.Members.Concat(_gossipNode.RemotePeers);
             o.RemoteEndPoint = _gossipNode.GossipPeer.EndPoint;
             o.Id = Guid.NewGuid().ToString();
             o.RequestMessageId = msg.Id;
@@ -194,7 +193,7 @@ namespace Solis.Gossip.Service
                 message.Id = Guid.NewGuid().ToString();
                 message.RemoteEndPoint = _gossipNode.GossipPeer.EndPoint;
                 message.Members.Add(_gossipNode.GossipPeer);
-                message.Members.AddRange(_gossipNode.RemotePeers);
+                message.Members.Concat(_gossipNode.RemotePeers);
 
                 await SendAsync(message, remotePeer.EndPoint);
             }
@@ -204,9 +203,51 @@ namespace Solis.Gossip.Service
             }
         }
 
-        protected GossipPeer SelectNeighbor(List<GossipPeer> memberList)
+        protected bool MergeLists(IGossipPeer senderPeer, IList<IGossipPeer> remoteList)
         {
-            GossipPeer peer = null;
+            var needReply = false;
+            foreach (GossipPeer remotePeer in remoteList)
+            {
+                if (remotePeer.Id == _gossipNode.GossipPeer.Id)
+                {
+                    continue;
+                }
+
+                var peer = _gossipNode.RemotePeers.FirstOrDefault(p => p.Id == remotePeer.Id);
+                if (peer != null)
+                {
+                    if (remotePeer.Heartbeat > peer.Heartbeat)
+                    {
+                        peer.Heartbeat = remotePeer.Heartbeat;
+
+                        if (peer.State == GossipPeerState.Online
+                                && remotePeer.State == GossipPeerState.Offline)
+                        {
+                            _gossipNode.DownPeer(remotePeer);
+                        }
+                        else if (peer.State == GossipPeerState.Offline
+                                && remotePeer.State == GossipPeerState.Online)
+                        {
+                            _gossipNode.WakeUpPeer(remotePeer);
+                        }
+                    }
+                    else
+                    {
+                        needReply = true;
+                    }
+                }
+                else
+                {
+                    _gossipNode.AddPeer(remotePeer);
+                }
+            }
+
+            return needReply;
+        }
+
+        protected IGossipPeer SelectNeighbor(IList<IGossipPeer> memberList)
+        {
+            IGossipPeer peer = null;
             if (memberList.Count > 0)
             {
                 int tryCount = 0;
@@ -230,11 +271,6 @@ namespace Solis.Gossip.Service
             }
 
             return peer;
-        }
-
-        private bool CheckHeartbeat(DateTime remoteHeartbeat)
-        {
-            return _gossipNode.GossipPeer.Heartbeat > remoteHeartbeat;
         }
 
         public void Shutdown()
@@ -286,12 +322,6 @@ namespace Solis.Gossip.Service
             }
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="uri"></param>
-        /// <returns></returns>
         public async Task SendAsync(BaseMessage message, IPEndPoint endPoint)
         {
             JsonSerializerSettings settings = new JsonSerializerSettings
@@ -317,55 +347,6 @@ namespace Solis.Gossip.Service
                     throw;
                 }
             }
-        }
-
-        /// <summary>
-        /// Merge remote list (received from peer), and our local member list. Simply, we must update the
-        /// heartbeats that the remote list has with our list.Also, some additional logic is needed to
-        /// make sure we have not timed out a member and then immediately received a list with that member.
-        /// </summary>
-        /// <param name="senderPeer"></param>
-        /// <param name="remoteList"></param>
-        protected bool MergeLists(GossipPeer senderPeer, List<GossipPeer> remoteList)
-        {
-            var needReply = false;
-            foreach (GossipPeer remotePeer in remoteList)
-            {
-                if (remotePeer.Id == _gossipNode.GossipPeer.Id)
-                {
-                    continue;
-                }
-
-                var peer = _gossipNode.RemotePeers.FirstOrDefault(p => p.Id == remotePeer.Id);
-                if (peer != null)
-                {
-                    if (remotePeer.Heartbeat > peer.Heartbeat)
-                    {
-                        peer.Heartbeat = remotePeer.Heartbeat;
-
-                        if(peer.State == GossipPeerState.Online 
-                                && remotePeer.State == GossipPeerState.Offline)
-                        {
-                            _gossipNode.DownPeer(remotePeer);
-                        }
-                        else if (peer.State == GossipPeerState.Offline
-                                && remotePeer.State == GossipPeerState.Online)
-                        {
-                            _gossipNode.WakeUpPeer(remotePeer);
-                        }
-                    }
-                    else
-                    {
-                        needReply = true;
-                    }
-                }
-                else
-                {
-                    _gossipNode.AddPeer(remotePeer);
-                }
-            }
-
-            return needReply;
         }
     }
 }

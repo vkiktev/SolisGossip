@@ -15,7 +15,7 @@ namespace Solis.Gossip.Service
     /// membership list, but if you choose to gossip additional information, you will need some logic to
     /// determine the incoming message.
     /// </summary>
-    public class ReceiveGossipThread : BaseGossipThread
+    public class ReceiveGossipThread
     {
         public static Logger Logger = SolisLogFactory.GetLogger(typeof(ReceiveGossipThread));
         
@@ -78,9 +78,9 @@ namespace Solis.Gossip.Service
                                     try
                                     {
                                         var message = packet.Buffer.Deserialize();
+                                        await _gossipManager.Recieve(message, packet.RemoteEndPoint);
 
                                         Logger.Debug($"Gossip Message of type {message.GetType()} was received");
-                                        await _gossipManager.Recieve(message, packet.RemoteEndPoint);
                                     }
                                     catch (Exception ex)
                                     {

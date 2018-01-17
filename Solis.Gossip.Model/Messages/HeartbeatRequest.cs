@@ -4,14 +4,14 @@ namespace Solis.Gossip.Model.Messages
 {
     public class HeartbeatRequest : BaseMessage
     {
-        public HeartbeatRequest(GossipPeer peer)
+        public HeartbeatRequest(IGossipPeer peer)
         {
             Peer = peer;
-            Members = new List<GossipPeer>();
+            Members = new List<IGossipPeer>();
         }
 
-        public List<GossipPeer> Members { get; private set; }
+        public IList<IGossipPeer> Members { get; private set; }
 
-        public GossipPeer Peer { get; set; }
+        public IGossipPeer Peer { get; set; }
     }
 }

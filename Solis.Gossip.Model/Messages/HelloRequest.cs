@@ -6,7 +6,7 @@ namespace Solis.Gossip.Model.Messages
 {
     public class HelloRequest : HeartbeatRequest
     {
-        public HelloRequest(GossipPeer peer) 
+        public HelloRequest(IGossipPeer peer) 
             : base(peer)
         {
         }

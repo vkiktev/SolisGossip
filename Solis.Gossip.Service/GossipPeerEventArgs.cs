@@ -5,13 +5,13 @@ namespace Solis.Gossip.Service
 {
     public class GossipPeerEventArgs : EventArgs
     {
-        private GossipPeer _peer;
-        public GossipPeerEventArgs(GossipPeer peer)
+        private IGossipPeer _peer;
+        public GossipPeerEventArgs(IGossipPeer peer)
         {
             _peer = peer;
         }
 
-        public GossipPeer Peer
+        public IGossipPeer Peer
         {
             get
             {

@@ -10,7 +10,7 @@ namespace Solis.Gossip.Service
     /// list. This information is important to maintaining a common state among all the nodes, and is
     /// important for detecting failures.
     /// </summary>
-    public class SendGossipThread : BaseGossipThread
+    public class SendGossipThread 
     {
         private static Logger Logger = SolisLogFactory.GetLogger(typeof(SendGossipThread));
 
@@ -21,7 +21,6 @@ namespace Solis.Gossip.Service
         private GossipManager _gossipManager;
 
         private CancellationTokenSource _cts = new CancellationTokenSource();
-        private bool _keepRunning;
         private Timer _replyTimer;
         private Timer _heartbeatTimer;
 
@@ -30,8 +29,6 @@ namespace Solis.Gossip.Service
             _gossipNode = gossipNode;
             _random = new Random();
             _gossipManager = gossipManager;
-
-            _keepRunning = true;
 
             _replyTimer = new Timer(new TimerCallback(ReplyTimerHandle));
             _heartbeatTimer = new Timer(new TimerCallback(HeartbeatTimerHandle));

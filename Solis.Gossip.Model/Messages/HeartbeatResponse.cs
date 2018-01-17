@@ -6,11 +6,11 @@ namespace Solis.Gossip.Model.Messages
     {
         public HeartbeatResponse()
         {
-            Members = new List<GossipPeer>();
+            Members = new List<IGossipPeer>();
         }
 
         public bool IsWelcome { get; set; }
 
-        public List<GossipPeer> Members { get; private set; }
+        public IList<IGossipPeer> Members { get; private set; }
     }
 }
