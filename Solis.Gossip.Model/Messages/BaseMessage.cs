@@ -1,9 +1,11 @@
-﻿namespace Solis.Gossip.Model.Messages
+﻿using System.Net;
+
+namespace Solis.Gossip.Model.Messages
 {
     public class BaseMessage 
     {
         public string Id { get; set; }
 
-        public string UriFrom { get; set; }
+        public IPEndPoint RemoteEndPoint { get; set; }
     }
 }

@@ -63,21 +63,21 @@ namespace Solis.Gossip.Service
             {
                 try
                 {
-                    using (var socket = new UdpClient(_gossipNode.GossipPeer.EndPoint))
+                    using (var udpClient = new UdpClient(_gossipNode.GossipPeer.EndPoint))
                     {
                         while (_keepRunning && !_cts.Token.IsCancellationRequested)
                         {
                             Logger.Debug($"I'm {_gossipNode.GossipPeer.Id} steel waiting for receive...");
                             try
                             {
-                                var packet = await socket.ReceiveAsync();
+                                var packet = await udpClient.ReceiveAsync();
 
                                 int packet_length = packet.Buffer?.Length ?? 0;
                                 if (packet_length <= GossipNode.MAX_PACKET_SIZE)
                                 {
                                     try
                                     {
-                                        var message = Deserialize(Encoding.UTF8.GetString(packet.Buffer, 0, packet_length));
+                                        var message = packet.Buffer.Deserialize();
 
                                         Logger.Debug($"Gossip Message of type {message.GetType()} was received");
                                         await _gossipManager.Recieve(message, packet.RemoteEndPoint);
@@ -109,7 +109,8 @@ namespace Solis.Gossip.Service
                     Logger.Error($"Poll process is NOT started '{ex.GetType()}': {ex.Message} at {ex.StackTrace}");
                     throw;
                 }
-            }, _cts.Token);         
+            }, 
+            _cts.Token);         
         }
 
         public void Shutdown()
@@ -123,20 +124,6 @@ namespace Solis.Gossip.Service
                 Logger.Error(ex, "Shutdown");
                 throw;
             }
-        }
-
-        public bool WaitStop()
-        {
-            try
-            {
-                _cts.Cancel();
-            }
-            catch(Exception ex)
-            {
-                Logger.Error(ex, "WaitStop");
-                return false;
-            }
-            return true;
         }
     }
 }

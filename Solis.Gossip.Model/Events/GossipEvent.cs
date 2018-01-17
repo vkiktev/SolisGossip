@@ -4,10 +4,12 @@
     {
         HelloSend,
         HelloReceive,
+        HelloAnswer,
         HelloExpired,
         HeartbeatElapsed,
         HeartbeatExpired,
         HeartbeatSend,
-        HeartbeatReceive
+        HeartbeatReceive,
+        HeartbeatAnswer
     }
 }

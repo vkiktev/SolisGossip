@@ -4,9 +4,9 @@
     {
         Incorrect,
         Initialized,
-        SentGreetings,
+        HelloSent,
         Infected,
         Susceptible,
-        SentHeartbeat
+        HeartbeatSent
     }
 }

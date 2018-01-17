@@ -1,12 +1,20 @@
 ﻿using Newtonsoft.Json;
 using Solis.Gossip.Model.Messages;
+using System.Text;
 
 namespace Solis.Gossip.Service
 {
-    public class BaseGossipThread
+    internal static class ServiceExtensions
     {
-        public static BaseMessage Deserialize(string json)
+        internal static BaseMessage Deserialize(this byte[] packet)
         {
+            if(packet == null)
+            {
+                return null;
+            }
+
+            var json = Encoding.UTF8.GetString(packet, 0, packet.Length);
+
             JsonSerializerSettings settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All
@@ -15,14 +23,16 @@ namespace Solis.Gossip.Service
             return JsonConvert.DeserializeObject<BaseMessage>(json, settings);
         }
 
-        public static string Serialize(object message)
+        internal static byte[] Serialize(this BaseMessage message)
         {
             JsonSerializerSettings settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All
             };
 
-            return JsonConvert.SerializeObject(message, settings);
+            var json = JsonConvert.SerializeObject(message, settings);
+
+            return Encoding.UTF8.GetBytes(json);
         }
     }
 }

@@ -11,7 +11,8 @@ namespace Solis.Gossip.UnitTests
         {
             var fakeNode = new GossipNode(new GossipSettings());
             GossipManager manager = new GossipManager(fakeNode);
-            manager.Fire(Model.Events.GossipEvent.SendGreetings);
+
+
         }
     }
 }
